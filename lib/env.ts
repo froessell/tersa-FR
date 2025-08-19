@@ -50,6 +50,11 @@ export const env = createEnv({
     RUNWAYML_API_SECRET: z.string().min(1).startsWith('key_'),
     LUMA_API_KEY: z.string().min(1).startsWith('luma-'),
     BF_API_KEY: z.string().min(1),
+
+    // Figma Integration
+    FIGMA_ACCESS_TOKEN: z.string().min(1).optional(),
+    FIGMA_TEAM_ID: z.string().min(1).optional(),
+    FIGMA_PROJECT_ID: z.string().min(1).optional(),
   },
   client: {
     NEXT_PUBLIC_TURNSTILE_SITE_KEY: z.string().min(1),
@@ -102,5 +107,8 @@ export const env = createEnv({
     LMNT_API_KEY: process.env.LMNT_API_KEY,
     BF_API_KEY: process.env.BF_API_KEY,
     PERPLEXITY_API_KEY: process.env.PERPLEXITY_API_KEY,
+    FIGMA_ACCESS_TOKEN: process.env.FIGMA_ACCESS_TOKEN,
+    FIGMA_TEAM_ID: process.env.FIGMA_TEAM_ID,
+    FIGMA_PROJECT_ID: process.env.FIGMA_PROJECT_ID,
   },
 });

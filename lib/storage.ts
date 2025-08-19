@@ -2,6 +2,7 @@ import { Component, GenerationRequest } from './types';
 
 const COMPONENTS_KEY = 'design-ai-components';
 const GENERATIONS_KEY = 'design-ai-generations';
+const FIGMA_SYNC_KEY = 'figma-sync-history';
 
 // Component Storage Functions
 export function saveComponent(component: Component): void {
@@ -15,6 +16,47 @@ export function saveComponent(component: Component): void {
   }
   
   localStorage.setItem(COMPONENTS_KEY, JSON.stringify(components));
+}
+
+export function saveFigmaComponents(figmaComponents: Component[]): void {
+  const existingComponents = getComponents();
+  
+  // Create a map of existing components by ID for quick lookup
+  const existingMap = new Map(existingComponents.map(c => [c.id, c]));
+  
+  // Process each Figma component
+  figmaComponents.forEach(figmaComponent => {
+    const existing = existingMap.get(figmaComponent.id);
+    
+    if (existing) {
+      // Update existing component with new Figma data
+      const updatedComponent: Component = {
+        ...existing,
+        ...figmaComponent,
+        updatedAt: new Date(),
+        // Preserve existing generated code and explanations
+        generatedCode: existing.generatedCode || figmaComponent.generatedCode,
+        codeExplanation: existing.codeExplanation || figmaComponent.codeExplanation,
+      };
+      existingMap.set(figmaComponent.id, updatedComponent);
+    } else {
+      // Add new component
+      existingMap.set(figmaComponent.id, figmaComponent);
+    }
+  });
+  
+  // Convert map back to array and save
+  const updatedComponents = Array.from(existingMap.values());
+  localStorage.setItem(COMPONENTS_KEY, JSON.stringify(updatedComponents));
+  
+  // Save sync history
+  if (figmaComponents.length > 0) {
+    saveFigmaSyncHistory({
+      timestamp: new Date().toISOString(),
+      componentCount: figmaComponents.length,
+      fileKey: figmaComponents[0]?.figmaData?.fileKey || 'unknown',
+    });
+  }
 }
 
 export function getComponents(): Component[] {
@@ -33,6 +75,10 @@ export function getComponents(): Component[] {
     console.error('Error loading components:', error);
     return [];
   }
+}
+
+export function getFigmaComponents(): Component[] {
+  return getComponents().filter(c => c.figmaData);
 }
 
 export function getComponentById(id: string): Component | null {
@@ -67,6 +113,42 @@ export function filterComponentsByCategory(category: string): Component[] {
   const components = getComponents();
   if (category === 'All') return components;
   return components.filter(c => c.category === category);
+}
+
+// Figma Sync History Functions
+export function saveFigmaSyncHistory(syncInfo: {
+  timestamp: string;
+  componentCount: number;
+  fileKey: string;
+}): void {
+  try {
+    const history = getFigmaSyncHistory();
+    history.unshift(syncInfo);
+    
+    // Keep only last 10 syncs
+    if (history.length > 10) {
+      history.splice(10);
+    }
+    
+    localStorage.setItem(FIGMA_SYNC_KEY, JSON.stringify(history));
+  } catch (error) {
+    console.error('Error saving Figma sync history:', error);
+  }
+}
+
+export function getFigmaSyncHistory(): Array<{
+  timestamp: string;
+  componentCount: number;
+  fileKey: string;
+}> {
+  try {
+    const stored = localStorage.getItem(FIGMA_SYNC_KEY);
+    if (!stored) return [];
+    return JSON.parse(stored);
+  } catch (error) {
+    console.error('Error loading Figma sync history:', error);
+    return [];
+  }
 }
 
 // Generation Storage Functions
