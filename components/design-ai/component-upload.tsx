@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dropzone, DropzoneContent, DropzoneEmptyState } from '@/components/ui/kibo-ui/dropzone';
 import { Badge } from '@/components/ui/badge';
-import { PlusIcon, XIcon, ImageIcon } from 'lucide-react';
+import { PlusIcon, XIcon, ImageIcon, ClipboardIcon } from 'lucide-react';
 import { Component, ComponentFormData, COMPONENT_CATEGORIES } from '@/lib/types';
 import { saveComponent, convertFileToDataURL, validateImageFile, isComponentNameUnique } from '@/lib/storage';
 
@@ -47,6 +47,7 @@ export function ComponentUpload({ onComponentAdded, editingComponent, onEditComp
   );
   const [tags, setTags] = useState<string[]>(editingComponent?.tags || []);
   const [tagInput, setTagInput] = useState('');
+  const [isPasting, setIsPasting] = useState(false);
 
   const form = useForm<ComponentFormValues>({
     resolver: zodResolver(componentFormSchema),
@@ -58,10 +59,7 @@ export function ComponentUpload({ onComponentAdded, editingComponent, onEditComp
     },
   });
 
-  const handleImageDrop = async (acceptedFiles: File[]) => {
-    const file = acceptedFiles[0];
-    if (!file) return;
-
+  const processImageFile = async (file: File) => {
     const validation = validateImageFile(file);
     if (!validation.valid) {
       toast.error(validation.error);
@@ -78,6 +76,60 @@ export function ComponentUpload({ onComponentAdded, editingComponent, onEditComp
       console.error('Image processing error:', error);
     }
   };
+
+  const handleImageDrop = async (acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    if (!file) return;
+    await processImageFile(file);
+  };
+
+  const handleClipboardPaste = useCallback(async () => {
+    setIsPasting(true);
+    try {
+      const clipboardItems = await navigator.clipboard.read();
+      
+      for (const clipboardItem of clipboardItems) {
+        const imageTypes = clipboardItem.types.filter(type => type.startsWith('image/'));
+        
+        if (imageTypes.length === 0) {
+          toast.error('No image found in clipboard');
+          continue;
+        }
+
+        const imageType = imageTypes[0];
+        const blob = await clipboardItem.getType(imageType);
+        
+        // Convert blob to file
+        const file = new File([blob], `clipboard-image.${imageType.split('/')[1]}`, {
+          type: imageType,
+        });
+
+        await processImageFile(file);
+        toast.success('Image pasted from clipboard!');
+        break;
+      }
+    } catch (error) {
+      console.error('Clipboard paste error:', error);
+      toast.error('Failed to paste image from clipboard. Make sure you have copied an image.');
+    } finally {
+      setIsPasting(false);
+    }
+  }, [form]);
+
+  // Add keyboard shortcut for paste (Ctrl+V / Cmd+V)
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'v' && (open || !!editingComponent)) {
+        event.preventDefault();
+        handleClipboardPaste();
+      }
+    };
+
+    if (open || !!editingComponent) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [open, editingComponent, handleClipboardPaste]);
 
   const handleAddTag = () => {
     if (tagInput.trim() && !tags.includes(tagInput.trim())) {
@@ -108,16 +160,49 @@ export function ComponentUpload({ onComponentAdded, editingComponent, onEditComp
       const imageUrl = await convertFileToDataURL(data.imageFile);
       const now = new Date();
 
-      const component: Component = {
+      // Create base component
+      let component: Component = {
         id: editingComponent?.id || nanoid(),
         name: data.name,
         description: data.description,
         category: data.category,
         tags: tags,
         imageUrl,
+        generatedCode: editingComponent?.generatedCode,
+        codeExplanation: editingComponent?.codeExplanation,
         createdAt: editingComponent?.createdAt || now,
         updatedAt: now,
       };
+
+      // Generate React code for new components or when image changes
+      if (!editingComponent || imageUrl !== editingComponent.imageUrl) {
+        try {
+          toast.info('Analyzing component and generating React code...');
+          
+          const response = await fetch('/api/design-ai/analyze-component', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              imageUrl,
+              name: data.name,
+              description: data.description,
+              category: data.category,
+            }),
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            component.generatedCode = result.generatedCode;
+            component.codeExplanation = result.explanation;
+            toast.success('React code generated successfully!');
+          } else {
+            toast.warning('Component saved, but code generation failed. You can try regenerating later.');
+          }
+        } catch (codeGenError) {
+          console.error('Code generation error:', codeGenError);
+          toast.warning('Component saved, but code generation failed. You can try regenerating later.');
+        }
+      }
 
       saveComponent(component);
       
@@ -184,41 +269,105 @@ export function ComponentUpload({ onComponentAdded, editingComponent, onEditComp
                   <FormLabel>Component Screenshot</FormLabel>
                   <FormControl>
                     <div className="space-y-4">
-                      <Dropzone
-                        accept={{ 'image/*': ['.png', '.jpg', '.jpeg', '.webp'] }}
-                        maxFiles={1}
-                        maxSize={5 * 1024 * 1024} // 5MB
-                        onDrop={handleImageDrop}
-                        className="h-48"
-                      >
-                        <DropzoneEmptyState>
-                          <div className="flex flex-col items-center justify-center">
-                            <div className="flex size-8 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                              <ImageIcon size={16} />
-                            </div>
-                            <p className="my-2 font-medium text-sm">
-                              Upload component screenshot
-                            </p>
-                            <p className="text-muted-foreground text-xs">
-                              PNG, JPG, WebP up to 5MB
-                            </p>
-                          </div>
-                        </DropzoneEmptyState>
-                        <DropzoneContent>
-                          {imagePreview && (
-                            <div className="flex flex-col items-center">
-                              <img 
-                                src={imagePreview} 
-                                alt="Component preview" 
-                                className="max-h-32 rounded-md object-contain"
-                              />
-                              <p className="mt-2 text-muted-foreground text-xs">
-                                Click or drag to replace image
+                      {/* Image Preview - Always visible when image exists */}
+                      {imagePreview && (
+                        <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4">
+                          <div className="flex flex-col items-center space-y-3">
+                            <img 
+                              src={imagePreview} 
+                              alt="Component preview" 
+                              className="max-h-48 max-w-full rounded-md object-contain shadow-sm"
+                            />
+                            <div className="flex flex-col items-center space-y-2">
+                              <p className="text-sm font-medium text-center">
+                                Component Screenshot Preview
                               </p>
+                              <div className="flex gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    const input = document.createElement('input');
+                                    input.type = 'file';
+                                    input.accept = 'image/*';
+                                    input.onchange = (e) => {
+                                      const file = (e.target as HTMLInputElement).files?.[0];
+                                      if (file) handleImageDrop([file]);
+                                    };
+                                    input.click();
+                                  }}
+                                  className="gap-2"
+                                >
+                                  <ImageIcon size={14} />
+                                  Replace
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={handleClipboardPaste}
+                                  disabled={isPasting}
+                                  className="gap-2"
+                                >
+                                  <ClipboardIcon size={14} />
+                                  {isPasting ? 'Pasting...' : 'Paste New'}
+                                </Button>
+                              </div>
                             </div>
-                          )}
-                        </DropzoneContent>
-                      </Dropzone>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Upload Area - Only show when no image */}
+                      {!imagePreview && (
+                        <div className="space-y-3">
+                          <Dropzone
+                            accept={{ 'image/*': ['.png', '.jpg', '.jpeg', '.webp'] }}
+                            maxFiles={1}
+                            maxSize={5 * 1024 * 1024} // 5MB
+                            onDrop={handleImageDrop}
+                            className="h-48"
+                          >
+                            <DropzoneEmptyState>
+                              <div className="flex flex-col items-center justify-center">
+                                <div className="flex size-8 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                                  <ImageIcon size={16} />
+                                </div>
+                                <p className="my-2 font-medium text-sm">
+                                  Upload component screenshot
+                                </p>
+                                <p className="text-muted-foreground text-xs">
+                                  PNG, JPG, WebP up to 5MB
+                                </p>
+                                <div className="flex items-center gap-2 mt-3">
+                                  <div className="h-px bg-border flex-1" />
+                                  <span className="text-muted-foreground text-xs">or</span>
+                                  <div className="h-px bg-border flex-1" />
+                                </div>
+                              </div>
+                            </DropzoneEmptyState>
+                          </Dropzone>
+                          
+                          <div className="flex justify-center">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={handleClipboardPaste}
+                              disabled={isPasting}
+                              className="gap-2"
+                            >
+                              <ClipboardIcon size={14} />
+                              {isPasting ? 'Pasting...' : 'Paste from Clipboard'}
+                            </Button>
+                          </div>
+                          
+                          <p className="text-center text-muted-foreground text-xs">
+                            💡 Tip: Copy an image from Figma and paste it here with <kbd className="px-1.5 py-0.5 text-xs bg-muted rounded">Ctrl+V</kbd> or <kbd className="px-1.5 py-0.5 text-xs bg-muted rounded">⌘+V</kbd>
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </FormControl>
                   <FormMessage />

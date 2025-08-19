@@ -14,7 +14,7 @@ import { SparklesIcon, ComponentIcon, PlusIcon, XIcon, CopyIcon } from 'lucide-r
 import type { DesignAINodeProps } from './index';
 import { getComponents, getComponentById } from '@/lib/storage';
 
-export const DesignAITransform = ({ data, id, title }: DesignAINodeProps & { title: string }) => {
+export const DesignAITransform = ({ data, id, type, title }: DesignAINodeProps & { title: string }) => {
   const updateNodeInternals = useUpdateNodeInternals();
   const connections = useNodeConnections({ id, handleType: 'target' });
   
@@ -25,13 +25,11 @@ export const DesignAITransform = ({ data, id, title }: DesignAINodeProps & { tit
 
   // Get input data from connected nodes
   const getInputContext = () => {
-    let context = '';
+    if (connections.length === 0) return '';
     
-    connections.forEach((connection) => {
-      const sourceNode = connection.source;
-      // Add logic to extract relevant data from connected nodes
-      // This could be text from text nodes, descriptions from image nodes, etc.
-      context += `Connected to ${sourceNode.type} node with data: ${JSON.stringify(sourceNode.data)}\n`;
+    let context = `Connected to ${connections.length} input node${connections.length !== 1 ? 's' : ''}:\n`;
+    connections.forEach((connection, index) => {
+      context += `- Input ${index + 1}: ${connection.source}\n`;
     });
     
     return context;
@@ -113,7 +111,7 @@ export const DesignAITransform = ({ data, id, title }: DesignAINodeProps & { tit
   };
 
   const getSelectedComponentsData = () => {
-    return selectedComponents.map(id => getComponentById(id)).filter(Boolean);
+    return selectedComponents.map(id => getComponentById(id)).filter((component): component is NonNullable<typeof component> => Boolean(component));
   };
 
   const handleCopyCode = async () => {
@@ -128,7 +126,7 @@ export const DesignAITransform = ({ data, id, title }: DesignAINodeProps & { tit
   };
 
   return (
-    <NodeLayout title={title} icon={SparklesIcon}>
+    <NodeLayout id={id} type={type} title={title}>
       <Handle type="target" position={Position.Left} />
       <Handle type="source" position={Position.Right} />
       

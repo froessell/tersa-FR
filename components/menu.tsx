@@ -11,7 +11,7 @@ import {
 import { useUser } from '@/hooks/use-user';
 import { createClient } from '@/lib/supabase/client';
 import { useSubscription } from '@/providers/subscription';
-import { ArrowUpRight, ArrowUpRightIcon, Loader2, LayoutIcon } from 'lucide-react';
+import { ArrowUpRight, ArrowUpRightIcon, Loader2, LayoutIcon, FolderIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type MouseEventHandler, useState } from 'react';
@@ -97,11 +97,12 @@ export const Menu = () => {
             Profile
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link href="/design-ai" className="flex items-center gap-2">
-              <LayoutIcon size={16} />
-              Design AI Tool
+            <Link href="/library" className="flex items-center gap-2">
+              <FolderIcon size={16} />
+              Component Library
             </Link>
           </DropdownMenuItem>
+
           {isSubscribed && (
             <DropdownMenuItem asChild className="justify-between">
               <a href="/api/portal" target="_blank" rel="noopener noreferrer">

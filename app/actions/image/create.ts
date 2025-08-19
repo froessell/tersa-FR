@@ -166,7 +166,7 @@ export const generateImageAction = async ({
 
     const name = `${nanoid()}.${extension}`;
 
-    const file: File = new File([image.uint8Array], name, {
+    const file: File = new File([image.uint8Array as BlobPart], name, {
       type: image.mimeType,
     });
 

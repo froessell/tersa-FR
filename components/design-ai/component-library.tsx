@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { SearchIcon, FilterIcon, EditIcon, TrashIcon, TagIcon, CalendarIcon, FolderIcon, ImageIcon, PlusIcon } from 'lucide-react';
+import { SearchIcon, FilterIcon, EditIcon, TrashIcon, TagIcon, CalendarIcon, FolderIcon, ImageIcon, PlusIcon, CodeIcon, CopyIcon, EyeIcon } from 'lucide-react';
 import { Component, ComponentCategory, COMPONENT_CATEGORIES } from '@/lib/types';
 import { getComponents, deleteComponent, searchComponents, filterComponentsByCategory } from '@/lib/storage';
 import { ComponentUpload } from './component-upload';
@@ -79,6 +79,15 @@ export function ComponentLibrary({
   const handleEditComplete = () => {
     setEditingComponent(null);
     loadComponents();
+  };
+
+  const handleCopyCode = async (code: string, componentName: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      toast.success(`${componentName} code copied to clipboard!`);
+    } catch (error) {
+      toast.error('Failed to copy code');
+    }
   };
 
   const handleComponentToggle = (componentId: string) => {
@@ -257,6 +266,49 @@ export function ComponentLibrary({
                       +{component.tags.length - 3}
                     </Badge>
                   )}
+                </div>
+              )}
+
+              {component.generatedCode && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center text-xs text-muted-foreground">
+                      <CodeIcon className="size-3 mr-1" />
+                      React Code Generated
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // This would open a live preview modal or navigate to preview
+                          console.log('Open live preview for:', component.name);
+                        }}
+                        className="h-6 px-2 text-xs"
+                      >
+                        <EyeIcon className="size-3 mr-1" />
+                        Preview
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCopyCode(component.generatedCode!, component.name);
+                        }}
+                        className="h-6 px-2 text-xs"
+                      >
+                        <CopyIcon className="size-3 mr-1" />
+                        Copy
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="bg-muted/50 rounded p-2 text-xs font-mono overflow-hidden">
+                    <div className="line-clamp-3 text-muted-foreground">
+                      {component.generatedCode.split('\n').slice(0, 3).join('\n')}
+                    </div>
+                  </div>
                 </div>
               )}
 

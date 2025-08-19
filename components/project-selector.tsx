@@ -24,7 +24,7 @@ import { handleError } from '@/lib/error/handle';
 import { cn } from '@/lib/utils';
 import type { projects } from '@/schema';
 import Fuse from 'fuse.js';
-import { CheckIcon, PlusIcon } from 'lucide-react';
+import { CheckIcon, PlusIcon, FolderIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   type FormEventHandler,
@@ -96,6 +96,12 @@ export const ProjectSelector = ({
     (projectId: string) => {
       if (projectId === 'new') {
         setCreateOpen(true);
+        return;
+      }
+
+      if (projectId === 'library') {
+        setOpen(false);
+        router.push('/library');
         return;
       }
 
@@ -182,6 +188,10 @@ export const ProjectSelector = ({
               <ComboboxItem value="new">
                 <PlusIcon size={16} />
                 Create new project
+              </ComboboxItem>
+              <ComboboxItem value="library">
+                <FolderIcon size={16} />
+                Component Library
               </ComboboxItem>
             </ComboboxGroup>
           </ComboboxList>

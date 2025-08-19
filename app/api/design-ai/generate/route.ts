@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { openai } from 'ai';
+import { openai } from '@ai-sdk/openai';
 import { generateText } from 'ai';
 import { Component, GenerationResponse } from '@/lib/types';
 

@@ -62,11 +62,12 @@ A React component generation tool that uses AI to create layouts based on your e
 ├── component-library.tsx     # Grid view with search/filter
 ├── chat-interface.tsx        # AI chat for generation
 ├── code-preview.tsx          # Code display and export
-├── design-ai-layout.tsx      # Main responsive layout
 └── index.ts                  # Exports
 
-/app/design-ai/
-└── page.tsx                  # Main page route
+/components/nodes/design-ai/
+├── index.tsx                 # Main node component with connection logic
+├── primitive.tsx             # Full interface for standalone use
+└── transform.tsx             # Compact interface for connected use
 
 /app/api/design-ai/
 ├── generate/route.ts         # AI generation endpoint
@@ -79,10 +80,10 @@ A React component generation tool that uses AI to create layouts based on your e
 
 ## Usage
 
-1. **Access the Tool**: Navigate to `/design-ai` or use the menu dropdown
-2. **Upload Components**: Add screenshots of your UI components with descriptions
+1. **Access the Tool**: Add a Design AI node (✨ icon) to your canvas from the toolbar
+2. **Upload Components**: Use the component library in the node to add screenshots of your UI components
 3. **Select Components**: Choose components you want to use for generation
-4. **Generate Designs**: Describe what you want to create in the chat
+4. **Generate Designs**: Describe what you want to create in the chat interface
 5. **Preview & Export**: View the generated code and copy/download it
 
 ## API Endpoints

@@ -17,7 +17,7 @@ import { SparklesIcon, ComponentIcon, SendIcon, CopyIcon, XIcon, PlusIcon } from
 import type { DesignAINodeProps } from './index';
 import { getComponents, getComponentById } from '@/lib/storage';
 
-export const DesignAIPrimitive = ({ data, id, title }: DesignAINodeProps & { title: string }) => {
+export const DesignAIPrimitive = ({ data, id, type, title }: DesignAINodeProps & { title: string }) => {
   const updateNodeInternals = useUpdateNodeInternals();
   const [prompt, setPrompt] = useState(data.prompt || '');
   const [selectedComponents, setSelectedComponents] = useState<string[]>(data.selectedComponents || []);
@@ -110,7 +110,7 @@ export const DesignAIPrimitive = ({ data, id, title }: DesignAINodeProps & { tit
   };
 
   const getSelectedComponentsData = () => {
-    return selectedComponents.map(id => getComponentById(id)).filter(Boolean);
+    return selectedComponents.map(id => getComponentById(id)).filter((component): component is NonNullable<typeof component> => Boolean(component));
   };
 
   const handleCopyCode = async () => {
@@ -125,7 +125,7 @@ export const DesignAIPrimitive = ({ data, id, title }: DesignAINodeProps & { tit
   };
 
   return (
-    <NodeLayout title={title} icon={SparklesIcon}>
+    <NodeLayout id={id} type={type} title={title}>
       <Handle type="source" position={Position.Right} />
       
       <div className="w-96">

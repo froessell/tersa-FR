@@ -14,6 +14,8 @@ export interface Component {
   tags: string[];
   imageUrl: string;
   imageFile?: File;
+  generatedCode?: string;
+  codeExplanation?: string;
   createdAt: Date;
   updatedAt: Date;
 }

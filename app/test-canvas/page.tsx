@@ -36,8 +36,8 @@ const initialNodes = [
 ];
 
 export default function TestCanvasPage() {
-  const [nodes, setNodes] = useState(initialNodes);
-  const [edges, setEdges] = useState([]);
+  const [nodes, setNodes] = useState<any[]>(initialNodes);
+  const [edges, setEdges] = useState<any[]>([]);
 
   const addDesignAINode = () => {
     const newNode = {
@@ -111,7 +111,7 @@ export default function TestCanvasPage() {
             onNodesChange={(changes) => {
               setNodes(prev => {
                 const updated = prev.map(node => {
-                  const change = changes.find(c => c.id === node.id);
+                  const change = changes.find((c: any) => c.id === node.id);
                   if (change && change.type === 'position' && change.position) {
                     return { ...node, position: change.position };
                   }

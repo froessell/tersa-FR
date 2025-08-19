@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { CopyIcon, DownloadIcon, MonitorIcon, TabletIcon, SmartphoneIcon, CodeIcon, EyeIcon, AlertTriangleIcon } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { AdvancedComponentRenderer } from './advanced-component-renderer';
 
 interface CodePreviewProps {
   code: string;
@@ -79,7 +80,7 @@ export function CodePreview({ code, onCodeChange }: CodePreviewProps) {
     }
   };
 
-  // Simple component to render the preview
+  // Use the advanced component renderer for live preview
   const PreviewRenderer = () => {
     if (!code.trim()) {
       return (
@@ -95,38 +96,8 @@ export function CodePreview({ code, onCodeChange }: CodePreviewProps) {
       );
     }
 
-    // For now, we'll show the code in a formatted way
-    // In a real implementation, you'd want to use a proper React renderer
-    // that can safely execute the generated JSX
-    return (
-      <div className="space-y-4">
-        <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-          <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
-            <AlertTriangleIcon className="size-4" />
-            <span className="text-sm font-medium">Preview Mode</span>
-          </div>
-          <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-            This is a code preview. In a production app, you'd implement a safe JSX renderer.
-          </p>
-        </div>
-        
-        <div className="border rounded-lg p-6 bg-background">
-          <SyntaxHighlighter
-            language="tsx"
-            style={oneDark}
-            customStyle={{
-              background: 'transparent',
-              padding: 0,
-              margin: 0,
-              fontSize: '14px',
-            }}
-            showLineNumbers={false}
-          >
-            {code}
-          </SyntaxHighlighter>
-        </div>
-      </div>
-    );
+    // Use the advanced component renderer to show live preview
+    return <AdvancedComponentRenderer code={code} />;
   };
 
   if (!code.trim()) {

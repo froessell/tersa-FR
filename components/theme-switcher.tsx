@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -30,6 +31,45 @@ const themes = [
 
 export const ThemeSwitcher = () => {
   const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  // useEffect only runs on the client, so now we can safely show the UI
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Render nothing on the server and until mounted to avoid hydration mismatch
+  if (!mounted) {
+    return (
+      <div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              size="icon"
+              variant="ghost"
+              aria-label="Select theme"
+              className="rounded-full"
+            >
+              <MonitorIcon size={16} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="min-w-32">
+            {themes.map((themeItem) => (
+              <DropdownMenuItem key={themeItem.value} disabled>
+                <themeItem.icon
+                  size={16}
+                  strokeWidth={2}
+                  className="opacity-60"
+                  aria-hidden="true"
+                />
+                <span>{themeItem.label}</span>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -43,22 +83,22 @@ export const ThemeSwitcher = () => {
           >
             {theme === 'light' && <SunIcon size={16} />}
             {theme === 'dark' && <MoonIcon size={16} />}
-            {theme === 'system' && <MonitorIcon size={16} />}
+            {(theme === 'system' || !theme) && <MonitorIcon size={16} />}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="min-w-32">
-          {themes.map((theme) => (
+          {themes.map((themeItem) => (
             <DropdownMenuItem
-              key={theme.value}
-              onClick={() => setTheme(theme.value)}
+              key={themeItem.value}
+              onClick={() => setTheme(themeItem.value)}
             >
-              <theme.icon
+              <themeItem.icon
                 size={16}
                 strokeWidth={2}
                 className="opacity-60"
                 aria-hidden="true"
               />
-              <span>{theme.label}</span>
+              <span>{themeItem.label}</span>
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
