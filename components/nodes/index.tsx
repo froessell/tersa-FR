@@ -1,5 +1,6 @@
 import { AudioNode } from './audio';
 import { CodeNode } from './code';
+import { DesignAINode } from './design-ai';
 import { DropNode } from './drop';
 import { FileNode } from './file';
 import { ImageNode } from './image';
@@ -16,4 +17,5 @@ export const nodeTypes = {
   code: CodeNode,
   file: FileNode,
   tweet: TweetNode,
+  'design-ai': DesignAINode,
 };

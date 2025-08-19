@@ -1,7 +1,7 @@
 import { SiX } from '@icons-pack/react-simple-icons';
 import { AudioWaveformIcon, FileIcon, VideoIcon } from 'lucide-react';
 
-import { CodeIcon, ImageIcon, TextIcon } from 'lucide-react';
+import { CodeIcon, ImageIcon, TextIcon, SparklesIcon } from 'lucide-react';
 
 export const nodeButtons = [
   {
@@ -41,5 +41,10 @@ export const nodeButtons = [
     id: 'tweet',
     label: 'Tweet',
     icon: SiX,
+  },
+  {
+    id: 'design-ai',
+    label: 'Design AI',
+    icon: SparklesIcon,
   },
 ];

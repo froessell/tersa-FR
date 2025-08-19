@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
       // Supabase storage, production
       {
         protocol: 'https',
-        hostname: 'zszbbhofscgnnkvyonow.supabase.co',
+        hostname: 'mtbmyoftcnqmefsiljtq.supabase.co',
       },
 
       // Supabase storage, development

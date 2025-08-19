@@ -66,13 +66,8 @@ export const POST = async (req: Request) => {
     let subject: string | undefined;
 
     if (email_action_type === 'signup') {
-      react = (
-        <SignupEmailTemplate
-          magicLink={magicLink.toString()}
-          email={user.email}
-        />
-      );
-      subject = 'Confirm your email address for Tersa';
+      // Skip sending signup confirmation emails since confirmations are disabled
+      return NextResponse.json({ message: 'Signup confirmation emails are disabled' }, { status: 200 });
     } else if (email_action_type === 'magiclink') {
       react = (
         <LoginEmailTemplate

@@ -7,7 +7,7 @@ import {
 } from '@/components/ui/card';
 
 const title = 'Thank you for signing up!';
-const description = 'Check your email to confirm';
+const description = 'Welcome to Tersa';
 
 export const metadata = {
   title,
@@ -22,9 +22,7 @@ const SignUpSuccessPage = () => (
     </CardHeader>
     <CardContent>
       <p className="text-muted-foreground text-sm">
-        You&apos;ve successfully signed up. Please check your email to confirm
-        your account before signing in. Remember to check your spam folder if
-        you don&apos;t see the email.
+        You&apos;ve successfully signed up and can now sign in to your account.
       </p>
     </CardContent>
   </Card>
