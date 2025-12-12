@@ -140,17 +140,29 @@ export const editImageAction = async ({
 
       image = generatedImageResponse.image;
     } else {
-      const base64Image = await fetch(images[0].url)
-        .then((res) => res.arrayBuffer())
-        .then((buffer) => Buffer.from(buffer).toString('base64'));
+      // Convert all images to base64 for combining
+      const base64Images = await Promise.all(
+        images.map(async (img) => {
+          const response = await fetch(img.url);
+          const arrayBuffer = await response.arrayBuffer();
+          return Buffer.from(arrayBuffer).toString('base64');
+        })
+      );
 
+      // Use the provider ID to determine the correct providerOptions key
+      const providerId = provider.id || 'nano-banana-pro';
+      
       const generatedImageResponse = await generateImage({
         model: provider.model,
         prompt,
         size: size as never,
         providerOptions: {
-          bfl: {
-            image: base64Image,
+          [providerId]: {
+            // Pass multiple images if more than one, otherwise single image
+            ...(base64Images.length > 1 
+              ? { images: base64Images }
+              : { image: base64Images[0] }
+            ),
           },
         },
       });

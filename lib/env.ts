@@ -50,6 +50,8 @@ export const env = createEnv({
     RUNWAYML_API_SECRET: z.string().min(1).startsWith('key_'),
     LUMA_API_KEY: z.string().min(1).startsWith('luma-'),
     BF_API_KEY: z.string().min(1),
+    NANO_BANANA_PRO_API_KEY: z.string().min(1),
+    NANO_BANANA_PRO_API_URL: z.string().url().optional(),
 
     // Figma Integration
     FIGMA_ACCESS_TOKEN: z.string().min(1).optional(),
@@ -106,6 +108,8 @@ export const env = createEnv({
     HUME_API_KEY: process.env.HUME_API_KEY,
     LMNT_API_KEY: process.env.LMNT_API_KEY,
     BF_API_KEY: process.env.BF_API_KEY,
+    NANO_BANANA_PRO_API_KEY: process.env.NANO_BANANA_PRO_API_KEY,
+    NANO_BANANA_PRO_API_URL: process.env.NANO_BANANA_PRO_API_URL,
     PERPLEXITY_API_KEY: process.env.PERPLEXITY_API_KEY,
     FIGMA_ACCESS_TOKEN: process.env.FIGMA_ACCESS_TOKEN,
     FIGMA_TEAM_ID: process.env.FIGMA_TEAM_ID,

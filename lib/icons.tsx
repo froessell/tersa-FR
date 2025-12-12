@@ -1541,6 +1541,17 @@ export const KlingIcon = (props: SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+export const NanoBanaProIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+    <title>Nano Banana Pro</title>
+    <path
+      d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM12 8C15.31 8 18 10.69 18 14C18 17.31 15.31 20 12 20C8.69 20 6 17.31 6 14C6 10.69 8.69 8 12 8ZM12 10C9.79 10 8 11.79 8 14C8 16.21 9.79 18 12 18C14.21 18 16 16.21 16 14C16 11.79 14.21 10 12 10Z"
+      fill="currentColor"
+    />
+    <circle cx="12" cy="14" r="2" fill="currentColor" opacity="0.6"/>
+  </svg>
+);
+
 export const AmazonBedrockIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg
     viewBox="0 0 189 190"

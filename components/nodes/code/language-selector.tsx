@@ -24,7 +24,7 @@ type LanguageSelectorProps = {
 export const LanguageSelector = ({
   id,
   value,
-  width = 200,
+  width = 132,
   className,
   onChange,
 }: LanguageSelectorProps) => {

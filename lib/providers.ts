@@ -19,6 +19,7 @@ import {
   MetaIcon,
   MinimaxIcon,
   MistralIcon,
+  NanoBanaProIcon,
   OpenAiIcon,
   PerplexityIcon,
   ReplicateIcon,
@@ -170,6 +171,11 @@ export const providers = {
     id: 'perplexity',
     name: 'Perplexity',
     icon: PerplexityIcon,
+  },
+  'nano-banana-pro': {
+    id: 'nano-banana-pro',
+    name: 'Nano Banana Pro',
+    icon: NanoBanaProIcon,
   },
 };
 

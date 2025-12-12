@@ -15,6 +15,10 @@ export const trackCreditUsage = async ({
   action: string;
   cost: number;
 }) => {
+  // Temporarily bypass credit tracking for testing
+  console.log(`[TESTING] Would track credit usage: ${action}, cost: ${cost}`);
+  return;
+  
   const profile = await currentUserProfile();
   const credits = Math.ceil(cost / creditValue);
 

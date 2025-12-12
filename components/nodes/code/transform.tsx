@@ -163,7 +163,7 @@ export const CodeTransform = ({
           <LanguageSelector
             value={language}
             onChange={handleLanguageChange}
-            className="w-[200px] rounded-full"
+            className="w-[132px] rounded-full"
           />
         ),
       },

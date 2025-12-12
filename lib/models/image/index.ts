@@ -8,8 +8,9 @@ import { luma } from '@ai-sdk/luma';
 import { openai } from '@ai-sdk/openai';
 import { xai } from '@ai-sdk/xai';
 import type { ImageModel } from 'ai';
-import { AmazonBedrockIcon, GrokIcon } from '../../icons';
+import { AmazonBedrockIcon, GrokIcon, NanoBanaProIcon } from '../../icons';
 import { blackForestLabs } from './black-forest-labs';
+import { nanoBananaPro } from './nano-banana-pro';
 
 const million = 1000000;
 
@@ -31,6 +32,25 @@ type TersaImageModel = TersaModel & {
 };
 
 export const imageModels: Record<string, TersaImageModel> = {
+  'nano-banana-pro': {
+    label: 'Nano Banana Pro',
+    chef: providers['nano-banana-pro'],
+    providers: [
+      {
+        ...providers['nano-banana-pro'],
+        model: nanoBananaPro.image('nano-banana-pro-v1'),
+        getCost: () => 0.05, // $0.05 per image
+      },
+    ],
+    sizes: ['512x512', '1024x1024', '1536x1536'],
+    supportsEdit: true,
+    default: true,
+  },
+};
+
+// Backup of all models (commented out)
+/*
+export const allImageModels: Record<string, TersaImageModel> = {
   'grok-2-image': {
     icon: GrokIcon,
     label: 'Grok 2 Image',
@@ -388,4 +408,53 @@ export const imageModels: Record<string, TersaImageModel> = {
     sizes: ['1024x1024', '1820x1024', '1024x1820'],
     supportsEdit: true,
   },
+  'nano-banana-pro-v1': {
+    label: 'Nano Banana Pro V1',
+    chef: providers['nano-banana-pro'],
+    providers: [
+      {
+        ...providers['nano-banana-pro'],
+        model: nanoBananaPro.image('nano-banana-pro-v1'),
+        getCost: () => 0.05, // $0.05 per image
+      },
+    ],
+    sizes: ['512x512', '1024x1024', '1536x1536'],
+  },
+  'nano-banana-pro-v2': {
+    label: 'Nano Banana Pro V2',
+    chef: providers['nano-banana-pro'],
+    providers: [
+      {
+        ...providers['nano-banana-pro'],
+        model: nanoBananaPro.image('nano-banana-pro-v2'),
+        getCost: () => 0.08, // $0.08 per image
+      },
+    ],
+    sizes: ['512x512', '1024x1024', '1536x1536', '2048x2048'],
+  },
+  'nano-banana-pro-ultra': {
+    label: 'Nano Banana Pro Ultra',
+    chef: providers['nano-banana-pro'],
+    providers: [
+      {
+        ...providers['nano-banana-pro'],
+        model: nanoBananaPro.image('nano-banana-pro-ultra'),
+        getCost: (props) => {
+          if (!props?.size) return 0.12;
+          
+          const [width, height] = props.size.split('x').map(Number);
+          const pixels = width * height;
+          
+          // Pricing based on resolution
+          if (pixels <= 1024 * 1024) return 0.12;
+          if (pixels <= 2048 * 2048) return 0.20;
+          return 0.35;
+        },
+      },
+    ],
+    sizes: ['512x512', '1024x1024', '1536x1536', '2048x2048', '4096x4096'],
+    supportsEdit: true,
+    default: false,
+  },
 };
+*/
