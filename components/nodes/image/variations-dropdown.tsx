@@ -42,28 +42,28 @@ const variations: VariationConfig[] = [
     label: 'Camera Angles',
     icon: CameraIcon,
     color: 'text-blue-500',
-    prompt: 'Create a variation with 9 different camera angles and perspectives arranged in a 3x3 grid.',
+    prompt: 'Using the provided input image as the base reference, create 9 variations with different camera angles and perspectives arranged in a 3x3 grid. Keep the exact same subject, person, and scene from the input image. Only change the camera angle and perspective. No margins or spacing between the images.',
   },
   {
     type: 'narrative',
     label: 'Narrative',
     icon: SparklesIcon,
     color: 'text-pink-500',
-    prompt: 'Create a variation with 9 different narrative elements and storytelling aspects arranged in a 3x3 grid.',
+    prompt: 'Using the provided input image as the base reference, create 9 variations with different narrative elements and storytelling aspects arranged in a 3x3 grid. Keep the exact same subject, person, and scene from the input image. Only change the narrative elements.',
   },
   {
     type: 'environment',
     label: 'Environment',
     icon: BoxIcon,
     color: 'text-green-500',
-    prompt: 'Create a variation with 9 different environments and settings arranged in a 3x3 grid.',
+    prompt: 'Using the provided input image as the base reference, create 9 variations with different environments and settings arranged in a 3x3 grid. Keep the exact same subject and person from the input image. Only change the environment and setting.',
   },
   {
     type: 'artistic-style',
     label: 'Artistic Style',
     icon: PaletteIcon,
     color: 'text-red-500',
-    prompt: 'Create a variation with 9 different artistic styles and visual aesthetics arranged in a 3x3 grid.',
+    prompt: 'Using the provided input image as the base reference, create 9 variations with different artistic styles and visual aesthetics arranged in a 3x3 grid. Keep the exact same subject, person, and scene from the input image. Only change the artistic style.',
   },
 ];
 

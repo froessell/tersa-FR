@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { useReactFlow } from '@xyflow/react';
 import { FileIcon, ImageIcon, VideoIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useNodeOperations } from './node-operations';
 import { useProject } from './project';
@@ -19,55 +20,63 @@ export const NodeDropzoneProvider = ({
   const { getViewport } = useReactFlow();
   const { addNode } = useNodeOperations();
   const project = useProject();
+
+  const createNodeFromFile = useCallback(
+    async (file: File, position?: { x: number; y: number }) => {
+      if (!project) return;
+
+      const uploaded = await uploadFile(file, 'files');
+
+      // Get the current viewport
+      const viewport = getViewport();
+
+      // Calculate the center of the current viewport if position not provided
+      const centerX =
+        position?.x ??
+        -viewport.x / viewport.zoom + window.innerWidth / 2 / viewport.zoom;
+      const centerY =
+        position?.y ??
+        -viewport.y / viewport.zoom + window.innerHeight / 2 / viewport.zoom;
+
+      let nodeType = 'file';
+
+      if (uploaded.type.startsWith('image/')) {
+        nodeType = 'image';
+      } else if (uploaded.type.startsWith('video/')) {
+        nodeType = 'video';
+      } else if (uploaded.type.startsWith('audio/')) {
+        nodeType = 'audio';
+      }
+
+      addNode(nodeType, {
+        data: {
+          content: {
+            url: uploaded.url,
+            type: uploaded.type,
+            name: file.name,
+          },
+        },
+        position: {
+          x: centerX,
+          y: centerY,
+        },
+      });
+    },
+    [project, getViewport, addNode]
+  );
+
   const dropzone = useDropzone({
     noClick: true,
     autoFocus: false,
     noKeyboard: true,
     disabled: !project,
     onDrop: async (acceptedFiles) => {
-      const uploads = await Promise.all(
-        acceptedFiles.map(async (file) => ({
-          name: file.name,
-          data: await uploadFile(file, 'files'),
-        }))
-      );
-
-      // Get the current viewport
-      const viewport = getViewport();
-
-      // Calculate the center of the current viewport
-      const centerX =
-        -viewport.x / viewport.zoom + window.innerWidth / 2 / viewport.zoom;
-      const centerY =
-        -viewport.y / viewport.zoom + window.innerHeight / 2 / viewport.zoom;
-
-      for (const { data, name } of uploads) {
-        let nodeType = 'file';
-
-        if (data.type.startsWith('image/')) {
-          nodeType = 'image';
-        } else if (data.type.startsWith('video/')) {
-          nodeType = 'video';
-        } else if (data.type.startsWith('audio/')) {
-          nodeType = 'audio';
-        }
-
-        addNode(nodeType, {
-          data: {
-            content: {
-              url: data.url,
-              type: data.type,
-              name,
-            },
-          },
-          position: {
-            x: centerX,
-            y: centerY,
-          },
-        });
+      for (const file of acceptedFiles) {
+        await createNodeFromFile(file);
       }
     },
   });
+
 
   return (
     <div {...dropzone.getRootProps()} className="size-full">

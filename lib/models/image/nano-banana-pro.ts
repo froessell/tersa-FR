@@ -1,71 +1,52 @@
 import { env } from '@/lib/env';
 import type { ImageModel } from 'ai';
+import { Runware } from '@runware/sdk-js';
 
 const models = [
   'nano-banana-pro-v1',
   'nano-banana-pro-v2',
   'nano-banana-pro-ultra',
+  'seedream-4.5',
+  'midjourney-7',
 ] as const;
 
-// Map model IDs to Google Gemini model names
-const modelMap: Record<(typeof models)[number], string> = {
-  'nano-banana-pro-v1': 'gemini-2.5-flash-image',
-  'nano-banana-pro-v2': 'gemini-3-pro-image-preview',
-  'nano-banana-pro-ultra': 'gemini-3-pro-image-preview',
+// Map model IDs to Runware AIR identifiers
+// Runware requires AIR IDs in format: "runware:101@1" or "civitai:xxx@xxx" or "bytedance:xxx@x.x" or "openai:2@3" or "google:4@2"
+// Find AIR IDs at: https://runware.ai/docs/en/image-inference/models
+// Or use the Model Explorer: https://runware.ai/docs/en/image-inference/models
+// API Reference: https://runware.ai/docs/en/image-inference/api-reference
+// Common format: provider:MODEL_ID@VERSION
+const modelMap: Record<string, string> = {
+  // Google Gemini models via Runware
+  'nano-banana-pro-v1': 'google:4@2', // Gemini 3 Pro Image Preview (Nano Banana 2)
+  'nano-banana-pro-v2': 'google:4@2', // Gemini 3 Pro Image Preview (Nano Banana 2)
+  'nano-banana-pro-ultra': 'google:4@2', // Gemini 3 Pro Image Preview (Nano Banana 2)
+  
+  // FLUX models from Black Forest Labs (BFL) via Runware
+  'flux-dev': 'runware:101@1', // FLUX.1 Dev
+  'flux-pro': 'runware:106@1', // FLUX.1 Pro
+  'flux-pro-1.1': 'runware:106@1', // FLUX.1 Pro (1.1 version uses same AIR ID as flux-pro)
+  'flux-2-pro': 'bfl:5@1', // FLUX.2 Pro
+  'flux-2-dev': 'runware:400@1', // FLUX.2 Dev
+  
+  // ByteDance models via Runware
+  'seedream-4.5': 'bytedance:seedream@4.5', // Seedream 4.5 from ByteDance
+  
+  // OpenAI models via Runware
+  'dall-e-2': 'openai:2@2', // DALL·E 2 via OpenAI provider on Runware
+  
+  // Midjourney via Runware
+  'midjourney-7': 'midjourney:3@1', // Midjourney V7 via Midjourney provider on Runware
+  
+  // Note: Photon Flash from Luma may not be available on Runware
+  // If not available, use Luma API directly via the luma provider in imageModels
+  'photon-flash-1': 'runware:101@1', // Placeholder - Photon Flash may need Luma API directly
 };
 
-// Convert width x height to aspect ratio string
-const getAspectRatio = (width: number, height: number): string => {
-  const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
-  const divisor = gcd(width, height);
-  return `${width / divisor}:${height / divisor}`;
-};
-
-// Convert size to resolution (1K, 2K, or 4K)
-const getResolution = (width: number, height: number): '1K' | '2K' | '4K' => {
-  const maxDimension = Math.max(width, height);
-  if (maxDimension >= 2048) return '4K';
-  if (maxDimension >= 1536) return '2K';
-  return '1K';
-};
-
-// Map aspect ratio to Gemini API supported ratios
-// Gemini supports: 1:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9
-const mapToGeminiAspectRatio = (ratio: string): string => {
-  const [w, h] = ratio.split(':').map(Number);
-  const ratioValue = w / h;
-  
-  // Map to closest supported Gemini aspect ratio
-  const supportedRatios: Array<[string, number]> = [
-    ['1:1', 1.0],
-    ['2:3', 2/3],
-    ['3:2', 3/2],
-    ['3:4', 3/4],
-    ['4:3', 4/3],
-    ['4:5', 4/5],
-    ['5:4', 5/4],
-    ['9:16', 9/16],
-    ['16:9', 16/9],
-    ['21:9', 21/9],
-  ];
-  
-  // Find closest match
-  let closest = supportedRatios[0];
-  let minDiff = Math.abs(ratioValue - closest[1]);
-  
-  for (const [ratioStr, ratioNum] of supportedRatios) {
-    const diff = Math.abs(ratioValue - ratioNum);
-    if (diff < minDiff) {
-      minDiff = diff;
-      closest = [ratioStr, ratioNum];
-    }
-  }
-  
-  return closest[0];
-};
+// Runware supports flexible dimensions, no need for aspect ratio mapping
 
 type CreateImageParams = {
-  modelId: (typeof models)[number];
+  modelId: string; // Allow any string model ID
   prompt: string;
   size: `${string}x${string}` | undefined;
   seed: number | undefined;
@@ -73,6 +54,32 @@ type CreateImageParams = {
   headers: Record<string, string | undefined> | undefined;
   imageBase64?: string; // Base64 encoded image for editing (single image)
   imagesBase64?: string[]; // Multiple base64 encoded images for combining
+  modelOverride?: string; // Override default model (for switching between Runware models)
+};
+
+// Create a singleton Runware instance to reuse WebSocket connections
+let runwareInstance: InstanceType<typeof Runware> | null = null;
+
+const getRunwareInstance = (): InstanceType<typeof Runware> => {
+  if (!runwareInstance) {
+    const apiKey = env.RUNWARE_API_KEY || env.NANO_BANANA_PRO_API_KEY;
+    if (!apiKey) {
+      throw new Error(
+        'Runware API key is not configured. ' +
+        'Please set RUNWARE_API_KEY or NANO_BANANA_PRO_API_KEY environment variable.'
+      );
+    }
+    
+    console.log('Creating new Runware SDK instance...');
+    runwareInstance = new Runware({
+      apiKey,
+      shouldReconnect: true,
+      globalMaxRetries: 3,
+      timeoutDuration: 300000, // 5 minutes for long operations
+    });
+    console.log('Runware SDK instance created');
+  }
+  return runwareInstance;
 };
 
 const createImage = async ({
@@ -84,256 +91,213 @@ const createImage = async ({
   headers,
   imageBase64,
   imagesBase64,
+  modelOverride,
 }: CreateImageParams) => {
-  const [width, height] = size?.split('x').map(Number) ?? [1024, 1024];
+  console.log('=== RUNWARE createImage CALLED (SDK) ===');
+  console.log('Model ID:', modelId);
+  console.log('Prompt:', prompt?.substring(0, 100));
+  console.log('Size (ignored, using model defaults):', size);
+  console.log('===============================');
 
-  // Validate aspect ratio constraints
-  const ratio = width / height;
-  if (ratio > 3 || ratio < 1/3) {
-    throw new Error('Aspect ratio must be between 1:3 and 3:1');
+  console.log(`Generating image with Runware ${modelId}:`, { prompt, seed });
+
+  // Get Runware model identifier (can be overridden via providerOptions)
+  const defaultModel = modelOverride || modelMap[modelId];
+  if (!defaultModel) {
+    throw new Error(`Unknown model ID: ${modelId}. Available models: ${Object.keys(modelMap).join(', ')}`);
   }
-
-  console.log(`Generating image with Nano Banana Pro ${modelId}:`, { prompt, width, height, seed });
-
-  // Use Google Generative AI API key (fallback to NANO_BANANA_PRO_API_KEY for compatibility)
-  const apiKey = env.GOOGLE_GENERATIVE_AI_API_KEY || env.NANO_BANANA_PRO_API_KEY;
-  if (!apiKey) {
+  
+  // Runware SDK requires AIR IDs in format: "runware:101@1" or "civitai:xxx@xxx"
+  // Ensure the model identifier is a valid AIR ID
+  let runwareModel = defaultModel;
+  if (!runwareModel.includes(':')) {
+    // If not an AIR ID format, throw an error
     throw new Error(
-      'Google Generative AI API key is not configured. ' +
-      'Please set GOOGLE_GENERATIVE_AI_API_KEY or NANO_BANANA_PRO_API_KEY environment variable.'
+      `Model "${runwareModel}" is not in AIR ID format. ` +
+      `Runware requires AIR IDs like "runware:101@1". ` +
+      `Please update the modelMap with the correct AIR ID for ${modelId}.`
     );
   }
-
-  // Get Gemini model name
-  const geminiModel = modelMap[modelId];
-  if (!geminiModel) {
-    throw new Error(`Unknown model ID: ${modelId}`);
-  }
+  
+  console.log(`Using Runware model AIR ID: ${runwareModel}`);
 
   try {
-    // Use Google Generative AI API endpoint
-    // https://ai.google.dev/gemini-api/docs/image-generation
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent`;
+    const runware = getRunwareInstance();
     
-    console.log('Calling Google Gemini API:', apiUrl);
-    console.log('Model:', geminiModel);
-    console.log('API Key present:', !!apiKey);
-    
-    const aspectRatio = getAspectRatio(width, height);
-    const resolution = getResolution(width, height);
-    
-    let response: Response;
+    console.log('Ensuring Runware connection...');
+    // Ensure connection is established
     try {
-      // Create a timeout controller
-      const timeoutMs = 60000; // 60 second timeout (image generation can take longer)
-      const timeoutController = new AbortController();
-      const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
-      
-      // Use provided abortSignal or timeout signal
-      const signalToUse = abortSignal || timeoutController.signal;
-
-      try {
-        // Build contents array - include images if provided for editing
-        const parts: any[] = [];
-        
-        // Add input image(s) if provided (for image editing/combining)
-        // Support both single image (imageBase64) and multiple images (imagesBase64)
-        const imagesToProcess = imagesBase64 && imagesBase64.length > 0 
-          ? imagesBase64 
-          : imageBase64 
-            ? [imageBase64] 
-            : [];
-        
-        for (const img of imagesToProcess) {
-          // Determine MIME type from base64 data URI or default to image/jpeg
-          let mimeType = 'image/jpeg';
-          let imageData = img;
-          
-          if (img.startsWith('data:')) {
-            const mimeMatch = img.match(/data:([^;]+)/);
-            if (mimeMatch) {
-              mimeType = mimeMatch[1];
-            }
-            // Remove data URI prefix
-            imageData = img.replace(/^data:[^;]+;base64,/, '');
-          }
-          
-          parts.push({
-            inlineData: {
-              mimeType,
-              data: imageData,
-            },
-          });
-        }
-        
-        // Add text prompt
-        parts.push({ text: prompt });
-
-        // REST API format
-        const requestBody: any = {
-          contents: [{
-            parts,
-          }],
-        };
-
-        // Map calculated aspect ratio to Gemini API supported ratios
-        // Gemini supports: 1:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9
-        const geminiAspectRatio = mapToGeminiAspectRatio(aspectRatio);
-
-        // Add generationConfig with imageConfig for aspect ratio
-        // Note: Gemini API only supports aspectRatio, not resolution
-        requestBody.generationConfig = {
-          responseModalities: ['IMAGE'],
-          imageConfig: {
-            aspectRatio: geminiAspectRatio,
-          },
-        };
-        
-        response = await fetch(`${apiUrl}?key=${apiKey}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...headers,
-          },
-          body: JSON.stringify(requestBody),
-          signal: signalToUse,
-        });
-      } finally {
-        clearTimeout(timeoutId);
-      }
-    } catch (fetchError) {
-      // Handle network errors (fetch failed, DNS errors, etc.)
-      if (fetchError instanceof TypeError) {
-        const errorMsg = fetchError.message.toLowerCase();
-        if (errorMsg.includes('fetch') || errorMsg.includes('network') || errorMsg.includes('failed')) {
-          throw new Error(
-            `Failed to connect to Google Gemini API at ${apiUrl}. ` +
-            `Possible causes: Network connectivity issues, invalid API key (check GOOGLE_GENERATIVE_AI_API_KEY), ` +
-            `API service unavailable, or firewall/proxy blocking the connection.`
-          );
-        }
-        if (errorMsg.includes('dns') || errorMsg.includes('getaddrinfo')) {
-          throw new Error(
-            `DNS resolution failed for ${apiUrl}. ` +
-            `Please verify your network connection and API key configuration.`
-          );
-        }
-      }
-      // Handle abort errors
-      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-        throw new Error('Image generation was cancelled or timed out');
-      }
-      // Re-throw with context
-      if (fetchError instanceof Error) {
-        throw new Error(`Network error: ${fetchError.message}`);
-      }
-      throw fetchError;
+      await Promise.race([
+        runware.ensureConnection(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Connection timeout after 30s')), 30000)
+        ),
+      ]);
+      console.log('Runware connection established');
+    } catch (connError) {
+      console.error('Failed to establish Runware connection:', connError);
+      throw new Error(`Failed to connect to Runware: ${connError instanceof Error ? connError.message : String(connError)}`);
     }
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorData;
-      try {
-        errorData = JSON.parse(errorText);
-      } catch {
-        errorData = { message: errorText };
-      }
-      
-      // Handle Google API error format: { error: { message: "...", status: "..." } }
-      const errorMessage = errorData.error?.message || errorData.message || `HTTP ${response.status}: ${response.statusText}`;
-      throw new Error(`Google Gemini API error: ${errorMessage}`);
-    }
-
-    const data = await response.json();
-
-    // Handle Google Gemini API response format
-    // Response structure: { candidates: [{ content: { parts: [{ inlineData: { data: "base64..." } }] }, finishReason, finishMessage }] }
-    if (!data.candidates || !data.candidates[0]) {
-      throw new Error('Invalid response format from Gemini API. Response: ' + JSON.stringify(data));
-    }
-
-    const candidate = data.candidates[0];
     
-    // Check finishReason first - if it's not STOP, the generation failed
-    if (candidate.finishReason && candidate.finishReason !== 'STOP') {
-      // Extract the error message from finishMessage if available
-      let errorMessage = candidate.finishMessage;
+    // Prepare request parameters
+    // Note: We only need 1 image, so set numberResults to 1
+    // If Runware requires a minimum (like 4), it will error and we can handle it
+    // Note: We're NOT passing width/height to let Runware use the model's default dimensions
+    // This avoids dimension validation errors since different models support different sizes
+    const requestParams: any = {
+      positivePrompt: prompt,
+      model: runwareModel,
+      numberResults: 1, // Request only 1 image
+    };
+    
+    // Add seed if provided
+    if (seed !== undefined && seed !== null) {
+      requestParams.seed = seed;
+    }
+    
+    // Add input image for image-to-image if provided
+    // Different models use different parameters:
+    // - FLUX/BFL models use 'seedImage'
+    // - Google models use 'referenceImages' (array)
+    if (imageBase64 || (imagesBase64 && imagesBase64.length > 0)) {
+      const inputImages = imagesBase64 && imagesBase64.length > 0 ? imagesBase64 : [imageBase64!];
       
-      // Also check for text parts that might contain error details
-      if (candidate.content?.parts) {
-        const textPart = candidate.content.parts.find((part: any) => part.text);
-        if (textPart?.text) {
-          errorMessage = textPart.text;
+      // Process images - remove data URI prefix if present
+      const processedImages = inputImages.map((img) => {
+        return img.startsWith('data:') 
+          ? img.replace(/^data:[^;]+;base64,/, '')
+          : img;
+      });
+      
+      // Google models use referenceImages array, others use seedImage
+      if (runwareModel.startsWith('google:')) {
+        requestParams.referenceImages = processedImages;
+      } else {
+        // Use seedImage for FLUX/BFL and other models (single image)
+        requestParams.seedImage = processedImages[0];
+      }
+    }
+    
+    console.log('Runware SDK Request:', JSON.stringify({
+      ...requestParams,
+      seedImage: requestParams.seedImage ? `[base64 image data, length: ${requestParams.seedImage.length}]` : undefined,
+      referenceImages: requestParams.referenceImages ? `[${requestParams.referenceImages.length} base64 image(s)]` : undefined,
+    }, null, 2));
+    
+    // Handle abort signal if provided
+    if (abortSignal?.aborted) {
+      throw new Error('Image generation was cancelled');
+    }
+    
+    console.log('Calling runware.requestImages()...');
+    const requestStartTime = Date.now();
+    
+    // Request images using SDK - handles WebSocket, polling, etc. automatically
+    // Add timeout wrapper to detect if it hangs
+    // Using 2 minute timeout initially to catch issues faster
+    let images: Awaited<ReturnType<typeof runware.requestImages>>;
+    try {
+      images = await Promise.race([
+        runware.requestImages(requestParams),
+        new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            console.error('Runware requestImages timeout after 2 minutes');
+            reject(new Error('Request timeout after 2 minutes'));
+          }, 120000); // 2 minutes
+        }),
+      ]);
+    } catch (requestError) {
+      const requestDuration = Date.now() - requestStartTime;
+      console.error(`Error during runware.requestImages() after ${requestDuration}ms:`, requestError);
+      // Check if it's a timeout or other error
+      if (requestError instanceof Error) {
+        if (requestError.message.includes('timeout')) {
+          throw new Error('Image generation timed out after 2 minutes. Please try again.');
         }
+        // Re-throw with more context
+        throw new Error(`Runware request failed: ${requestError.message}`);
       }
-      
-      // If no message found, provide helpful context based on finishReason
-      if (!errorMessage) {
-        switch (candidate.finishReason) {
-          case 'NO_IMAGE':
-            errorMessage = 'The model could not generate an image based on the prompt provided. Try rephrasing your prompt or adjusting the instructions.';
-            break;
-          case 'IMAGE_OTHER':
-            errorMessage = 'Unable to generate the image. The model could not generate the image based on the prompt provided. Try rephrasing your prompt.';
-            break;
-          case 'SAFETY':
-            errorMessage = 'Image generation was blocked due to safety concerns. Please adjust your prompt.';
-            break;
-          case 'RECITATION':
-            errorMessage = 'Image generation was blocked due to potential copyright concerns. Please adjust your prompt.';
-            break;
-          default:
-            errorMessage = `Image generation failed with reason: ${candidate.finishReason}. Please try rephrasing your prompt.`;
+      throw requestError;
+    }
+    
+    const requestDuration = Date.now() - requestStartTime;
+    console.log(`Runware requestImages completed in ${requestDuration}ms`);
+    console.log(`Received ${images?.length ?? 0} images from Runware`);
+    
+    if (!images || images.length === 0) {
+      throw new Error('No images returned from Runware API');
+    }
+    
+    const firstImage = images[0];
+    console.log('Runware SDK Response:', {
+      imageURL: firstImage.imageURL,
+      hasImageBase64Data: !!firstImage.imageBase64Data,
+      hasImageDataURI: !!firstImage.imageDataURI,
+    });
+    
+    // Get image data - prefer base64 data, then data URI, then URL
+    let imageBase64Data: string;
+    
+    if (firstImage.imageBase64Data) {
+      // Already base64 data without prefix
+      console.log('Using imageBase64Data from response');
+      imageBase64Data = firstImage.imageBase64Data;
+    } else if (firstImage.imageDataURI) {
+      // Remove data URI prefix if present
+      console.log('Using imageDataURI from response');
+      imageBase64Data = firstImage.imageDataURI.replace(/^data:[^;]+;base64,/, '');
+    } else if (firstImage.imageURL) {
+      // Fetch image from URL
+      console.log(`Fetching image from URL: ${firstImage.imageURL}`);
+      try {
+        const imageResponse = await fetch(firstImage.imageURL, { 
+          signal: abortSignal,
+          // Add headers to ensure we can fetch the image
+          headers: {
+            'Accept': 'image/*',
+          },
+        });
+        console.log(`Image fetch response status: ${imageResponse.status} ${imageResponse.statusText}`);
+        if (!imageResponse.ok) {
+          throw new Error(`Failed to fetch image from Runware: ${imageResponse.status} ${imageResponse.statusText}`);
         }
+        const imageBuffer = await imageResponse.arrayBuffer();
+        console.log(`Image buffer size: ${imageBuffer.byteLength} bytes`);
+        imageBase64Data = Buffer.from(imageBuffer).toString('base64');
+        console.log(`Successfully fetched and converted image, base64 length: ${imageBase64Data.length}`);
+      } catch (fetchError) {
+        console.error('Error fetching image from URL:', fetchError);
+        throw new Error(`Failed to fetch image from Runware URL: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`);
       }
-      
-      throw new Error(errorMessage);
-    }
-
-    if (!candidate.content) {
-      throw new Error('Invalid response format from Gemini API: no content in candidate. Response: ' + JSON.stringify(data));
-    }
-
-    const parts = candidate.content.parts;
-    if (!parts || !Array.isArray(parts)) {
-      throw new Error('No parts found in response. Response: ' + JSON.stringify(data));
-    }
-
-    // Find the image part (inlineData)
-    const imagePart = parts.find((part: any) => part.inlineData);
-    if (!imagePart || !imagePart.inlineData || !imagePart.inlineData.data) {
-      // Check if there's a text part with error message
-      const textPart = parts.find((part: any) => part.text);
-      if (textPart?.text) {
-        throw new Error(textPart.text);
-      }
-      throw new Error('No image data found in response. Make sure responseModalities includes "IMAGE".');
+    } else {
+      throw new Error('No image data found in Runware SDK response');
     }
 
     // Decode base64 image data
-    const base64Data = imagePart.inlineData.data;
-    const imageBuffer = Buffer.from(base64Data, 'base64');
-    return new Uint8Array(imageBuffer);
+    console.log(`Converting base64 to Uint8Array, base64 length: ${imageBase64Data.length}`);
+    const imageBuffer = Buffer.from(imageBase64Data, 'base64');
+    const uint8Array = new Uint8Array(imageBuffer);
+    console.log(`Returning Uint8Array with length: ${uint8Array.length}`);
+    return uint8Array;
   } catch (error) {
-    console.error('Google Gemini API error:', error);
+    console.error('Runware SDK error:', error);
     // If error is already a well-formatted Error, re-throw it as-is
     if (error instanceof Error) {
       // Don't double-wrap if it's already a formatted error
-      if (error.message.includes('Google Gemini') || 
-          error.message.includes('Gemini') ||
+      if (error.message.includes('Runware') || 
           error.message.includes('Failed to connect') ||
           error.message.includes('API key') ||
           error.message.includes('cancelled')) {
         throw error;
       }
-      throw new Error(`Google Gemini API error: ${error.message}`);
+      throw new Error(`Runware API error: ${error.message}`);
     }
     throw error;
   }
 };
 
 export const nanoBananaPro = {
-  image: (modelId: (typeof models)[number]): ImageModel => ({
+  image: (modelId: string): ImageModel => ({
     modelId,
     provider: 'nano-banana-pro',
     specificationVersion: 'v1',
@@ -351,32 +315,45 @@ export const nanoBananaPro = {
       let imageBase64: string | undefined;
       let imagesBase64: string[] | undefined;
       
+      // Extract model override from providerOptions if provided
+      let modelOverride: string | undefined;
+      
       if (providerOptions) {
         // Check for nano-banana-pro provider key first
         const providerData = providerOptions['nano-banana-pro'];
         
+        // Support model override for switching between Runware models
+        if (providerData?.model && typeof providerData.model === 'string') {
+          modelOverride = providerData.model;
+        }
+        
         // Support both single image and multiple images
-        if (providerData?.image) {
+        if (providerData?.image && typeof providerData.image === 'string') {
           imageBase64 = providerData.image;
         } else if (providerData?.images && Array.isArray(providerData.images)) {
-          imagesBase64 = providerData.images;
+          // Type guard: ensure all items in array are strings
+          const validImages = providerData.images.filter((img): img is string => typeof img === 'string');
+          if (validImages.length > 0) {
+            imagesBase64 = validImages;
+          }
         }
         
         // Fallback: check other common keys
         if (!imageBase64 && !imagesBase64) {
-          const googleData = providerOptions.google;
-          const geminiData = providerOptions.gemini;
+          const runwareData = providerOptions.runware;
           const bflData = providerOptions.bfl;
           
-          if (googleData?.image) {
-            imageBase64 = googleData.image;
-          } else if (googleData?.images && Array.isArray(googleData.images)) {
-            imagesBase64 = googleData.images;
-          } else if (geminiData?.image) {
-            imageBase64 = geminiData.image;
-          } else if (geminiData?.images && Array.isArray(geminiData.images)) {
-            imagesBase64 = geminiData.images;
-          } else if (bflData?.image) {
+          if (runwareData?.image && typeof runwareData.image === 'string') {
+            imageBase64 = runwareData.image;
+          } else if (runwareData?.images && Array.isArray(runwareData.images)) {
+            // Type guard: ensure all items in array are strings
+            const validImages = runwareData.images.filter((img): img is string => typeof img === 'string');
+            if (validImages.length > 0) {
+              imagesBase64 = validImages;
+            }
+          } else if (runwareData?.model && typeof runwareData.model === 'string' && !modelOverride) {
+            modelOverride = runwareData.model;
+          } else if (bflData?.image && typeof bflData.image === 'string') {
             imageBase64 = bflData.image; // For backward compatibility
           }
         }
@@ -385,12 +362,16 @@ export const nanoBananaPro = {
         if (!imageBase64 && !imagesBase64) {
           for (const key in providerOptions) {
             const data = providerOptions[key];
-            if (data?.image) {
+            if (data?.image && typeof data.image === 'string') {
               imageBase64 = data.image;
               break;
             } else if (data?.images && Array.isArray(data.images)) {
-              imagesBase64 = data.images;
-              break;
+              // Type guard: ensure all items in array are strings
+              const validImages = data.images.filter((img): img is string => typeof img === 'string');
+              if (validImages.length > 0) {
+                imagesBase64 = validImages;
+                break;
+              }
             }
           }
         }
@@ -405,6 +386,7 @@ export const nanoBananaPro = {
         headers,
         imageBase64,
         imagesBase64,
+        modelOverride,
       });
 
       return {

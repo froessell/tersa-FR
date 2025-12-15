@@ -42,9 +42,167 @@ export const imageModels: Record<string, TersaImageModel> = {
         getCost: () => 0.05, // $0.05 per image
       },
     ],
-    sizes: ['512x512', '1024x1024', '1536x1536'],
+    // sizes removed - using model defaults from Runware
     supportsEdit: true,
     default: true,
+  },
+  'nano-banana-pro-v1': {
+    label: 'Nano Banana Pro V1',
+    chef: providers['nano-banana-pro'],
+    providers: [
+      {
+        ...providers['nano-banana-pro'],
+        model: nanoBananaPro.image('nano-banana-pro-v1'),
+        getCost: () => 0.05, // $0.05 per image
+      },
+    ],
+    // sizes removed - using model defaults from Runware
+    supportsEdit: true,
+  },
+  'nano-banana-pro-v2': {
+    label: 'Nano Banana Pro V2',
+    chef: providers['nano-banana-pro'],
+    providers: [
+      {
+        ...providers['nano-banana-pro'],
+        model: nanoBananaPro.image('nano-banana-pro-v2'),
+        getCost: () => 0.08, // $0.08 per image
+      },
+    ],
+    // sizes removed - using model defaults from Runware
+    supportsEdit: true,
+  },
+  'nano-banana-pro-ultra': {
+    label: 'Nano Banana Pro Ultra',
+    chef: providers['nano-banana-pro'],
+    providers: [
+      {
+        ...providers['nano-banana-pro'],
+        model: nanoBananaPro.image('nano-banana-pro-ultra'),
+        getCost: () => 0.12, // Simplified pricing - using default size
+      },
+    ],
+    // sizes removed - using model defaults from Runware
+    supportsEdit: true,
+  },
+  'dall-e-2': {
+    label: 'DALL-E 2',
+    chef: providers['nano-banana-pro'],
+    providers: [
+      {
+        ...providers['nano-banana-pro'],
+        model: nanoBananaPro.image('dall-e-2'),
+        getCost: () => 0.02, // Simplified pricing - using default size
+      },
+    ],
+    // sizes removed - using model defaults from Runware
+    priceIndicator: 'low',
+  },
+  'flux-pro-1.1': {
+    label: 'FLUX Pro 1.1',
+    chef: providers['nano-banana-pro'],
+    providers: [
+      {
+        ...providers['nano-banana-pro'],
+        model: nanoBananaPro.image('flux-pro-1.1'),
+        getCost: () => 0.04,
+      },
+    ],
+    // sizes removed - using model defaults from Runware
+    supportsEdit: true,
+  },
+  'flux-pro': {
+    label: 'FLUX Pro',
+    chef: providers['nano-banana-pro'],
+    providers: [
+      {
+        ...providers['nano-banana-pro'],
+        model: nanoBananaPro.image('flux-pro'),
+        getCost: () => 0.05,
+      },
+    ],
+    // sizes removed - using model defaults from Runware
+    supportsEdit: true,
+  },
+  'flux-dev': {
+    label: 'FLUX Dev',
+    chef: providers['nano-banana-pro'],
+    providers: [
+      {
+        ...providers['nano-banana-pro'],
+        model: nanoBananaPro.image('flux-dev'),
+        getCost: () => 0.025,
+      },
+    ],
+    // sizes removed - using model defaults from Runware
+    supportsEdit: true,
+    priceIndicator: 'low',
+  },
+  'flux-2-pro': {
+    label: 'FLUX.2 Pro',
+    chef: providers['nano-banana-pro'],
+    providers: [
+      {
+        ...providers['nano-banana-pro'],
+        model: nanoBananaPro.image('flux-2-pro'),
+        getCost: () => 0.05,
+      },
+    ],
+    // sizes removed - using model defaults from Runware
+    supportsEdit: true,
+  },
+  'flux-2-dev': {
+    label: 'FLUX.2 Dev',
+    chef: providers['nano-banana-pro'],
+    providers: [
+      {
+        ...providers['nano-banana-pro'],
+        model: nanoBananaPro.image('flux-2-dev'),
+        getCost: () => 0.025,
+      },
+    ],
+    // sizes removed - using model defaults from Runware
+    supportsEdit: true,
+    priceIndicator: 'low',
+  },
+  'photon-flash-1': {
+    label: 'Photon Flash 1',
+    chef: providers['nano-banana-pro'],
+    providers: [
+      {
+        ...providers['nano-banana-pro'],
+        model: nanoBananaPro.image('photon-flash-1'),
+        getCost: () => 0.003, // Simplified pricing - using default size (estimated)
+      },
+    ],
+    // sizes removed - using model defaults from Runware
+    supportsEdit: true,
+  },
+  'seedream-4.5': {
+    label: 'Seedream 4.5',
+    chef: providers['nano-banana-pro'],
+    providers: [
+      {
+        ...providers['nano-banana-pro'],
+        model: nanoBananaPro.image('seedream-4.5'),
+        getCost: () => 0.06, // Estimated pricing
+      },
+    ],
+    // sizes removed - using model defaults from Runware
+    supportsEdit: true,
+  },
+  'midjourney-7': {
+    label: 'Midjourney 7',
+    chef: providers['nano-banana-pro'],
+    providers: [
+      {
+        ...providers['nano-banana-pro'],
+        model: nanoBananaPro.image('midjourney-7'),
+        getCost: () => 0.10, // Estimated pricing - Midjourney tends to be premium
+      },
+    ],
+    // sizes removed - using model defaults from Runware
+    supportsEdit: false, // Midjourney typically doesn't support image editing
   },
 };
 

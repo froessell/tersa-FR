@@ -69,7 +69,7 @@ const formats: FormatConfig[] = [
       }
       
       // If no widescreen size exists, calculate one based on the largest available size
-      // Use 16:9 aspect ratio which Gemini API supports
+      // Use 16:9 aspect ratio which Runware supports
       const maxSize = modelSizes.reduce((max, size) => {
         const [width, height] = size.split('x').map(Number);
         const maxPixels = max.split('x').map(Number).reduce((a, b) => a * b);
@@ -80,7 +80,7 @@ const formats: FormatConfig[] = [
       const [maxWidth, maxHeight] = maxSize.split('x').map(Number);
       const maxDimension = Math.max(maxWidth, maxHeight);
       
-      // Calculate 16:9 dimensions (Gemini supports 16:9)
+      // Calculate 16:9 dimensions (Runware supports flexible aspect ratios)
       // For 16:9, height = width * 9/16
       if (maxDimension >= 1536) {
         const width = 1536;
@@ -117,7 +117,7 @@ const formats: FormatConfig[] = [
       }
       
       // If no portrait size exists, calculate one based on the largest available size
-      // Use 9:16 aspect ratio which Gemini API supports
+      // Use 9:16 aspect ratio which Runware supports
       const maxSize = modelSizes.reduce((max, size) => {
         const [width, height] = size.split('x').map(Number);
         const maxPixels = max.split('x').map(Number).reduce((a, b) => a * b);
@@ -128,7 +128,7 @@ const formats: FormatConfig[] = [
       const [maxWidth, maxHeight] = maxSize.split('x').map(Number);
       const maxDimension = Math.max(maxWidth, maxHeight);
       
-      // Calculate 9:16 dimensions (Gemini supports 9:16)
+      // Calculate 9:16 dimensions (Runware supports flexible aspect ratios)
       // For 9:16, width = height * 9/16
       if (maxDimension >= 1536) {
         const height = 1536;

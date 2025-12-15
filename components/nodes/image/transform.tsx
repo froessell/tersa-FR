@@ -1,6 +1,7 @@
 import { generateImageAction } from '@/app/actions/image/create';
 import { editImageAction } from '@/app/actions/image/edit';
 import { NodeLayout } from '@/components/nodes/layout';
+import { ModelSelector } from '@/components/nodes/model-selector';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -19,13 +20,21 @@ import { useNodeOperations } from '@/providers/node-operations';
 import { useProject } from '@/providers/project';
 import { getIncomers, useReactFlow } from '@xyflow/react';
 import {
+  BoxIcon,
+  CameraIcon,
   ClockIcon,
   ColumnsIcon,
   DownloadIcon,
   EyeIcon,
   Loader2Icon,
+  MoreHorizontalIcon,
+  PaletteIcon,
   PlayIcon,
+  RectangleHorizontalIcon,
+  RectangleVerticalIcon,
   RotateCcwIcon,
+  SparklesIcon,
+  SquareIcon,
 } from 'lucide-react';
 import Image from 'next/image';
 import {
@@ -41,6 +50,14 @@ import type { ImageNodeProps } from '.';
 import { ImageSizeSelector } from './image-size-selector';
 import { VariationsDropdown } from './variations-dropdown';
 import { FormatSelector } from './format-selector';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 type ImageTransformProps = ImageNodeProps & {
   title: string;
@@ -234,6 +251,19 @@ export const ImageTransform = ({
   const toolbar = useMemo<ComponentProps<typeof NodeLayout>['toolbar']>(() => {
     const items: ComponentProps<typeof NodeLayout>['toolbar'] = [];
 
+    // Add model selector
+    items.push({
+      children: (
+        <ModelSelector
+          value={modelId}
+          options={imageModels}
+          key={id}
+          className="w-[150px] rounded-full"
+          onChange={(value) => updateNodeData(id, { model: value })}
+        />
+      ),
+    });
+
     // Add size selector if available
     if (selectedModel?.sizes?.length) {
       items.push({
@@ -242,7 +272,7 @@ export const ImageTransform = ({
             value={size ?? ''}
             options={selectedModel?.sizes ?? []}
             id={id}
-            className="w-[200px] rounded-full"
+            className="w-[120px] rounded-full"
             onChange={(value) => updateNodeData(id, { size: value })}
           />
         ),
@@ -279,81 +309,284 @@ export const ImageTransform = ({
           }
     );
 
+    // Add more options dropdown if image is generated
     if (data.generated && project?.id) {
-      if (selectedModel?.supportsEdit) {
-        items.push({
-          tooltip: 'Variations',
-          children: (
-            <VariationsDropdown
-              nodeId={id}
-              imageUrl={data.generated.url}
-              imageType={data.generated.type}
-              modelId={modelId}
-              size={size}
-              projectId={project.id}
-            />
-          ),
-        });
+      const handleVariationsClick = async (variationType: 'camera-angles' | 'narrative' | 'environment' | 'artistic-style') => {
+        const variations = {
+          'camera-angles': 'Using the provided input image as the base reference, create 9 variations with different camera angles and perspectives arranged in a 3x3 grid. Keep the exact same subject, person, and scene from the input image. Only change the camera angle and perspective.',
+          'narrative': 'Using the provided input image as the base reference, create 9 variations with different narrative elements and storytelling aspects arranged in a 3x3 grid. Keep the exact same subject, person, and scene from the input image. Only change the narrative elements.',
+          'environment': 'Using the provided input image as the base reference, create 9 variations with different environments and settings arranged in a 3x3 grid. Keep the exact same subject and person from the input image. Only change the environment and setting.',
+          'artistic-style': 'Using the provided input image as the base reference, create 9 variations with different artistic styles and visual aesthetics arranged in a 3x3 grid. Keep the exact same subject, person, and scene from the input image. Only change the artistic style.',
+        };
+        
+        const currentNode = getNode(id);
+        if (!currentNode || !project?.id) return;
 
-        items.push({
-          tooltip: 'Formats',
-          children: (
-            <FormatSelector
-              nodeId={id}
-              imageUrl={data.generated.url}
-              imageType={data.generated.type}
-              modelId={modelId}
-              currentSize={size}
-              projectId={project.id}
-            />
-          ),
-        });
-      }
+        // Read the current model from the node data to ensure we use the latest selection
+        const currentModelId = (currentNode.data?.model as string) ?? modelId ?? getDefaultModel(imageModels);
+        const currentSize = currentNode.data?.size as string | undefined ?? size;
+
+        try {
+          const newNodeId = addNode('image', {
+            position: {
+              x: currentNode.position.x + (currentNode.measured?.width ?? 400) + 100,
+              y: currentNode.position.y,
+            },
+            data: {
+              model: currentModelId,
+              size: currentSize,
+              instructions: variations[variationType],
+            },
+            selected: true,
+          });
+
+          addEdges({
+            id: `edge-${id}-${newNodeId}`,
+            source: id,
+            target: newNodeId,
+            type: 'animated',
+          });
+
+          updateNode(id, { selected: false });
+
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+
+          const response = await editImageAction({
+            images: [
+              {
+                url: data.generated.url,
+                type: data.generated.type,
+              },
+            ],
+            instructions: variations[variationType],
+            nodeId: newNodeId,
+            projectId: project.id,
+            modelId: currentModelId,
+            size: currentSize,
+          });
+
+          if ('error' in response) {
+            throw new Error(response.error);
+          }
+
+          updateNodeData(newNodeId, response.nodeData);
+          toast.success('Variation created');
+          setTimeout(() => mutate('credits'), 5000);
+        } catch (error) {
+          handleError('Error creating variation', error);
+        }
+      };
+
+      const handleFormatClick = async (formatType: 'square' | 'widescreen' | 'portrait') => {
+        const model = imageModels[modelId];
+        const modelSizes = model?.sizes;
+        
+        const formatConfigs = {
+          square: {
+            getSize: (currentSize: string | undefined, modelSizes: string[] | undefined) => {
+              if (!modelSizes || modelSizes.length === 0) return null;
+              const squareSizes = modelSizes.filter(size => {
+                const [width, height] = size.split('x').map(Number);
+                return width === height;
+              });
+              return squareSizes.length > 0 ? squareSizes[squareSizes.length - 1] : modelSizes[0];
+            },
+            instructions: 'Convert this image to square format. Adjust the composition to fit a square aspect ratio while maintaining the original subject. Extend or crop the background as needed to create a balanced square composition.',
+          },
+          widescreen: {
+            getSize: (currentSize: string | undefined, modelSizes: string[] | undefined) => {
+              if (!modelSizes || modelSizes.length === 0) return null;
+              const widescreenSizes = modelSizes.filter(size => {
+                const [width, height] = size.split('x').map(Number);
+                const ratio = width / height;
+                return ratio > 1.5 && ratio < 2.0;
+              });
+              if (widescreenSizes.length > 0) return widescreenSizes[0];
+              const maxSize = modelSizes.reduce((max, size) => {
+                const [width, height] = size.split('x').map(Number);
+                const maxPixels = max.split('x').map(Number).reduce((a, b) => a * b);
+                const currentPixels = width * height;
+                return currentPixels > maxPixels ? size : max;
+              });
+              const [maxWidth, maxHeight] = maxSize.split('x').map(Number);
+              const maxDimension = Math.max(maxWidth, maxHeight);
+              if (maxDimension >= 1536) return '1536x864';
+              if (maxDimension >= 1024) return '1024x576';
+              return '512x288';
+            },
+            instructions: 'Extend this image to widescreen (16:9) format. Expand the image content horizontally to fill the entire frame, maintaining the original subject and composition. Add appropriate background elements or extend the existing background naturally to fill the widescreen aspect ratio.',
+          },
+          portrait: {
+            getSize: (currentSize: string | undefined, modelSizes: string[] | undefined) => {
+              if (!modelSizes || modelSizes.length === 0) return null;
+              const portraitSizes = modelSizes.filter(size => {
+                const [width, height] = size.split('x').map(Number);
+                const ratio = width / height;
+                return ratio < 0.7 && ratio > 0.4;
+              });
+              if (portraitSizes.length > 0) return portraitSizes[0];
+              const maxSize = modelSizes.reduce((max, size) => {
+                const [width, height] = size.split('x').map(Number);
+                const maxPixels = max.split('x').map(Number).reduce((a, b) => a * b);
+                const currentPixels = width * height;
+                return currentPixels > maxPixels ? size : max;
+              });
+              const [maxWidth, maxHeight] = maxSize.split('x').map(Number);
+              const maxDimension = Math.max(maxWidth, maxHeight);
+              if (maxDimension >= 1536) return '864x1536';
+              if (maxDimension >= 1024) return '576x1024';
+              return '288x512';
+            },
+            instructions: 'Extend this image to portrait (9:16) format. Expand the image content vertically to fill the entire frame, maintaining the original subject and composition. Add appropriate background elements or extend the existing background naturally to fill the portrait aspect ratio.',
+          },
+        };
+
+        const format = formatConfigs[formatType];
+        const newSize = format.getSize(size, modelSizes);
+        
+        if (!newSize) {
+          toast.error(`Format "${formatType}" is not available for this model`);
+          return;
+        }
+
+        if (newSize === size) {
+          toast.info(`Image is already in ${formatType} format`);
+          return;
+        }
+
+        const currentNode = getNode(id);
+        if (!currentNode || !project?.id) return;
+
+        try {
+          const newNodeId = addNode('image', {
+            position: {
+              x: currentNode.position.x + (currentNode.measured?.width ?? 400) + 100,
+              y: currentNode.position.y,
+            },
+            data: {
+              model: modelId,
+              size: newSize,
+              instructions: `Generate in ${formatType} format`,
+            },
+            selected: true,
+          });
+
+          addEdges({
+            id: `edge-${id}-${newNodeId}`,
+            source: id,
+            target: newNodeId,
+            type: 'animated',
+          });
+
+          updateNode(id, { selected: false });
+
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+
+          const response = await editImageAction({
+            images: [
+              {
+                url: data.generated.url,
+                type: data.generated.type,
+              },
+            ],
+            instructions: format.instructions,
+            nodeId: newNodeId,
+            projectId: project.id,
+            modelId,
+            size: newSize,
+          });
+
+          if ('error' in response) {
+            throw new Error(response.error);
+          }
+
+          updateNodeData(newNodeId, response.nodeData);
+          toast.success(`${formatType} format generated`);
+          setTimeout(() => mutate('credits'), 5000);
+        } catch (error) {
+          handleError(`Error generating ${formatType} format`, error);
+        }
+      };
 
       items.push({
-        tooltip: splitting ? 'Splitting...' : 'Split into 9 images',
         children: (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="rounded-full"
-            onClick={handleSplit}
-            disabled={splitting}
-          >
-            {splitting ? (
-              <Loader2Icon size={12} className="animate-spin" />
-            ) : (
-              <ColumnsIcon size={12} />
-            )}
-          </Button>
-        ),
-      });
-
-      items.push({
-        tooltip: 'Download',
-        children: (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="rounded-full"
-            onClick={() => download(data.generated, id, 'png')}
-          >
-            <DownloadIcon size={12} />
-          </Button>
-        ),
-      });
-    }
-
-    if (data.updatedAt) {
-      items.push({
-        tooltip: `Last updated: ${new Intl.DateTimeFormat('en-US', {
-          dateStyle: 'short',
-          timeStyle: 'short',
-        }).format(new Date(data.updatedAt))}`,
-        children: (
-          <Button size="icon" variant="ghost" className="rounded-full">
-            <ClockIcon size={12} />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="rounded-full">
+                <MoreHorizontalIcon size={12} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              {selectedModel?.supportsEdit && (
+                <>
+                  <DropdownMenuLabel>Variations</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => handleVariationsClick('camera-angles')}>
+                    <CameraIcon size={14} className="shrink-0 text-blue-500" />
+                    <span>Camera Angles</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleVariationsClick('narrative')}>
+                    <SparklesIcon size={14} className="shrink-0 text-pink-500" />
+                    <span>Narrative</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleVariationsClick('environment')}>
+                    <BoxIcon size={14} className="shrink-0 text-green-500" />
+                    <span>Environment</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleVariationsClick('artistic-style')}>
+                    <PaletteIcon size={14} className="shrink-0 text-red-500" />
+                    <span>Artistic Style</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel>Formats</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => handleFormatClick('square')}>
+                    <SquareIcon size={14} className="shrink-0" />
+                    <span>Square</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleFormatClick('widescreen')}>
+                    <RectangleHorizontalIcon size={14} className="shrink-0" />
+                    <span>Widescreen (16:9)</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleFormatClick('portrait')}>
+                    <RectangleVerticalIcon size={14} className="shrink-0" />
+                    <span>Portrait (9:16)</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuItem
+                onClick={handleSplit}
+                disabled={splitting}
+              >
+                {splitting ? (
+                  <Loader2Icon size={14} className="shrink-0 animate-spin" />
+                ) : (
+                  <ColumnsIcon size={14} className="shrink-0" />
+                )}
+                <span>Split into 9 images</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => download(data.generated, id, 'png')}
+              >
+                <DownloadIcon size={14} className="shrink-0" />
+                <span>Download</span>
+              </DropdownMenuItem>
+              {data.updatedAt && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem disabled>
+                    <ClockIcon size={14} className="shrink-0" />
+                    <span className="text-muted-foreground text-xs">
+                      {new Intl.DateTimeFormat('en-US', {
+                        dateStyle: 'short',
+                        timeStyle: 'short',
+                      }).format(new Date(data.updatedAt))}
+                    </span>
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         ),
       });
     }
@@ -373,6 +606,11 @@ export const ImageTransform = ({
     modelId,
     splitting,
     handleSplit,
+    getNode,
+    addNode,
+    addEdges,
+    updateNode,
+    imageModels,
   ]);
 
   const aspectRatio = useMemo(() => {

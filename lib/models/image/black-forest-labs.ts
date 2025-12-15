@@ -3,8 +3,15 @@ import type { paths } from '@/openapi/bfl';
 import type { ImageModel } from 'ai';
 import createFetchClient, { type Client } from 'openapi-fetch';
 
-const createClient = () =>
-  createFetchClient<paths>({
+const createClient = () => {
+  if (!env.BF_API_KEY) {
+    throw new Error(
+      'Black Forest Labs API key is not configured. ' +
+      'Please set BF_API_KEY environment variable.'
+    );
+  }
+  
+  return createFetchClient<paths>({
     baseUrl: 'https://api.us1.bfl.ai',
     headers: {
       'Content-Type': 'application/json',
@@ -12,6 +19,7 @@ const createClient = () =>
     },
     fetch: fetch,
   });
+};
 
 const models = [
   'flux-pro-1.1',
@@ -196,21 +204,38 @@ export const blackForestLabs = {
         imagePrompt = providerOptions.bfl.image;
       }
 
-      const jobResponse = await createJob({
-        client,
-        modelId,
-        prompt,
-        size,
-        seed,
-        abortSignal,
-        headers,
-        imagePrompt,
-      });
+      let jobResponse;
+      try {
+        jobResponse = await createJob({
+          client,
+          modelId,
+          prompt,
+          size,
+          seed,
+          abortSignal,
+          headers,
+          imagePrompt,
+        });
+      } catch (error) {
+        if (error instanceof Error) {
+          // Check if it's a fetch error
+          if (error.message.includes('fetch') || error.message.includes('Failed to fetch')) {
+            throw new Error(
+              `Failed to connect to Black Forest Labs API. ` +
+              `Please check your BF_API_KEY and network connection. ` +
+              `Error: ${error.message}`
+            );
+          }
+          throw error;
+        }
+        throw new Error(`Black Forest Labs API error: ${String(error)}`);
+      }
 
       if (jobResponse.error) {
-        throw new Error(
-          jobResponse.error.detail?.at(0)?.msg ?? 'Unknown error'
-        );
+        const errorMsg = jobResponse.error.detail?.at(0)?.msg ?? 
+                        jobResponse.error.error ?? 
+                        'Unknown error';
+        throw new Error(`Black Forest Labs API error: ${errorMsg}`);
       }
 
       if (!jobResponse.data?.id) {

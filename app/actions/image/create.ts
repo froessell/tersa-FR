@@ -146,6 +146,7 @@ export const generateImageAction = async ({
         ].join('\n'),
         size: size as never,
         aspectRatio,
+        providerOptions: model.providerOptions,
       });
 
       await trackCreditUsage({

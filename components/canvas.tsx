@@ -4,6 +4,7 @@ import { updateProjectAction } from '@/app/actions/project/update';
 import { useAnalytics } from '@/hooks/use-analytics';
 import { useSaveProject } from '@/hooks/use-save-project';
 import { handleError } from '@/lib/error/handle';
+import { uploadFile } from '@/lib/upload';
 import { isValidSourceTarget } from '@/lib/xyflow';
 import { NodeDropzoneProvider } from '@/providers/node-dropzone';
 import { NodeOperationsProvider } from '@/providers/node-operations';
@@ -30,7 +31,7 @@ import {
 import { BoxSelectIcon, PlusIcon } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import type { MouseEvent, MouseEventHandler } from 'react';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useDebouncedCallback } from 'use-debounce';
 import { ConnectionLine } from './connection-line';
@@ -70,6 +71,7 @@ export const Canvas = ({ children, ...props }: ReactFlowProps) => {
     getNodes,
     getNode,
     updateNode,
+    getViewport,
   } = useReactFlow();
   const analytics = useAnalytics();
   const [saveState, setSaveState] = useSaveProject();
@@ -310,7 +312,89 @@ export const Canvas = ({ children, ...props }: ReactFlowProps) => {
     }
   }, [getNodes]);
 
-  const handlePaste = useCallback(() => {
+  const handlePasteImage = useCallback(
+    async (file: File) => {
+      // Upload the file
+      const uploaded = await uploadFile(file, 'files');
+
+      // Get the current viewport
+      const viewport = getViewport();
+
+      // Calculate the center of the current viewport
+      const centerX =
+        -viewport.x / viewport.zoom + window.innerWidth / 2 / viewport.zoom;
+      const centerY =
+        -viewport.y / viewport.zoom + window.innerHeight / 2 / viewport.zoom;
+
+      // Create image node
+      addNode('image', {
+        data: {
+          content: {
+            url: uploaded.url,
+            type: uploaded.type,
+            name: file.name,
+          },
+        },
+        position: {
+          x: centerX,
+          y: centerY,
+        },
+      });
+
+      analytics.track('toolbar', 'node', 'added', {
+        type: 'image',
+        source: 'clipboard',
+      });
+    },
+    [addNode, getViewport, analytics]
+  );
+
+  const handlePaste = useCallback(async () => {
+    // Don't handle paste if user is typing in an input field
+    const activeElement = document.activeElement;
+    if (
+      activeElement instanceof HTMLInputElement ||
+      activeElement instanceof HTMLTextAreaElement ||
+      (activeElement instanceof HTMLElement && activeElement.isContentEditable)
+    ) {
+      return;
+    }
+
+    // First, try to check clipboard for images using Clipboard API
+    try {
+      if (navigator.clipboard && navigator.clipboard.read) {
+        const clipboardItems = await navigator.clipboard.read();
+
+        for (const clipboardItem of clipboardItems) {
+          const imageTypes = clipboardItem.types.filter((type) =>
+            type.startsWith('image/')
+          );
+
+          if (imageTypes.length > 0) {
+            const imageType = imageTypes[0];
+            const blob = await clipboardItem.getType(imageType);
+
+            // Convert blob to file
+            const file = new File(
+              [blob],
+              `clipboard-image.${imageType.split('/')[1] || 'png'}`,
+              {
+                type: imageType,
+              }
+            );
+
+            await handlePasteImage(file);
+            return; // Image handled, don't proceed to node paste
+          }
+        }
+      }
+    } catch (error) {
+      // Clipboard API might not be available or permission denied
+      // Fall through to check for copied nodes
+      console.debug('Clipboard API not available:', error);
+    }
+
+    // Fall back to pasting copied nodes if no image found
     if (copiedNodes.length === 0) {
       return;
     }
@@ -335,7 +419,7 @@ export const Canvas = ({ children, ...props }: ReactFlowProps) => {
 
     // Add new nodes
     setNodes((nodes: Node[]) => [...nodes, ...newNodes]);
-  }, [copiedNodes]);
+  }, [copiedNodes, handlePasteImage]);
 
   const handleDuplicateAll = useCallback(() => {
     const selected = getNodes().filter((node) => node.selected);
@@ -373,6 +457,47 @@ export const Canvas = ({ children, ...props }: ReactFlowProps) => {
     enableOnContentEditable: false,
     preventDefault: true,
   });
+
+  // Also listen to paste events as a fallback (in case Clipboard API fails)
+  useEffect(() => {
+    if (!project) return;
+
+    const handlePasteEvent = async (event: ClipboardEvent) => {
+      // Don't handle paste if user is typing in an input field
+      const target = event.target;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        (target instanceof HTMLElement && target.isContentEditable)
+      ) {
+        return;
+      }
+
+      // Check if clipboard contains image data using the paste event
+      const items = event.clipboardData?.items;
+      if (!items) return;
+
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith('image/')) {
+          event.preventDefault();
+          event.stopPropagation();
+
+          const file = item.getAsFile();
+          if (!file) continue;
+
+          await handlePasteImage(file);
+          break; // Only handle the first image
+        }
+      }
+    };
+
+    // Use capture phase to catch paste events early
+    document.addEventListener('paste', handlePasteEvent, true);
+
+    return () => {
+      document.removeEventListener('paste', handlePasteEvent, true);
+    };
+  }, [project, handlePasteImage]);
 
   return (
     <NodeOperationsProvider addNode={addNode} duplicateNode={duplicateNode}>
